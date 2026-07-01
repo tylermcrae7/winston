@@ -15,11 +15,13 @@ struct NewCredentialListenerModifier: ViewModifier {
     content
       .onOpenURL { url in
         if case .editingCredential(_) = nav.presentingSheet {} else if let queryParams = url.queryParameters, let appID = queryParams["appID"], let appSecret = queryParams["appSecret"] {
-          if var foundCred = redditCredentialsManager.credentials.first(where: { $0.apiAppID == appID }) {
-            foundCred.apiAppSecret = appSecret
+          let normalizedAppID = RedditAPI.normalizedCredentialComponent(appID)
+          let normalizedAppSecret = RedditAPI.normalizedCredentialComponent(appSecret)
+          if var foundCred = redditCredentialsManager.credentials.first(where: { RedditAPI.normalizedCredentialComponent($0.apiAppID) == normalizedAppID }) {
+            foundCred.apiAppSecret = normalizedAppSecret
             Nav.present(.editingCredential(foundCred))
           } else {
-            Nav.present(.editingCredential(.init(apiAppID: appID, apiAppSecret: appSecret)))
+            Nav.present(.editingCredential(.init(apiAppID: normalizedAppID, apiAppSecret: normalizedAppSecret)))
           }
         }
       }

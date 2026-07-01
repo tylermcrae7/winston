@@ -25,12 +25,14 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
   func isInKeychain() -> Bool { RedditCredentialsManager.shared.credentials.contains { $0.id == self.id } }
   var validationStatus: CredentialValidationState {
     var newRedditAPIPairState: CredentialValidationState = .empty
+    let appID = RedditAPI.normalizedCredentialComponent(apiAppID)
+    let appSecret = RedditAPI.normalizedCredentialComponent(apiAppSecret)
     
-    if self.apiAppID.count == 22 && self.apiAppSecret.count == 30 {
+    if appID.count == 22 && appSecret.count == 30 {
       newRedditAPIPairState = .valid
-    } else if self.apiAppID.count > 10 && self.apiAppSecret.count > 20 {
+    } else if appID.count > 10 && appSecret.count > 20 {
       newRedditAPIPairState = .maybeValid
-    } else if self.apiAppID.count > 0 || self.apiAppSecret.count > 0 {
+    } else if appID.count > 0 || appSecret.count > 0 {
       newRedditAPIPairState = .invalid
     }
     
@@ -90,7 +92,10 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
   }
   
   func getUpToDateToken(forceRenew: Bool = false, saveToken: Bool = true) async -> AccessToken? {
-    guard let refreshToken = self.refreshToken, !apiAppID.isEmpty && !apiAppSecret.isEmpty else { return nil }
+    let appID = RedditAPI.normalizedCredentialComponent(apiAppID)
+    let appSecret = RedditAPI.normalizedCredentialComponent(apiAppSecret)
+
+    guard let refreshToken = self.refreshToken, !appID.isEmpty && !appSecret.isEmpty else { return nil }
     if !forceRenew, let accessToken = self.accessToken {
       let lastRefresh = Double(accessToken.lastRefresh.timeIntervalSince1970)
       let expiration = Double(max(0, accessToken.expiration - 100))
@@ -112,7 +117,7 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
           encoder: URLEncodedFormParameterEncoder(destination: .httpBody),
           headers: headers
         )
-          .authenticate(username: apiAppID, password: apiAppSecret, persistence: .none)
+          .authenticate(username: appID, password: appSecret, persistence: .none)
           .validate()
           .serializingDecodable(RedditAPI.RefreshAccessTokenResponse.self).response.result
         return result
@@ -128,7 +133,7 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
         }
         return newAccessToken
       case .failure(let error):
-        print("pipo", error, payload)
+        print("Reddit OAuth refresh failed: \(error)")
         switch error.responseCode {
         case 401:
           var selfCopy = self

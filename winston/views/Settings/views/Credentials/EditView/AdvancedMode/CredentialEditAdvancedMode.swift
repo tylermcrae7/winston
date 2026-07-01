@@ -37,12 +37,12 @@ struct CredentialEditAdvancedMode: View {
               VStack(alignment: .leading, spacing: 16) {
                 BigInput(l: "App ID", bg: .acceptablePrimary, t: Binding(get: {
                   draftCredential.apiAppID
-                }, set: { draftCredential.apiAppID = $0.replacingOccurrences(of: " ", with: "")
+                }, set: { draftCredential.apiAppID = RedditAPI.normalizedCredentialComponent($0)
                 }), placeholder: "Ex: aijsd78_UN4iuq8dm7m@mr")
                 
                 BigInput(l: "App Secret", bg: .acceptablePrimary, t: Binding(get: {
                   draftCredential.apiAppSecret
-                }, set: { draftCredential.apiAppSecret = $0.replacingOccurrences(of: " ", with: "")
+                }, set: { draftCredential.apiAppSecret = RedditAPI.normalizedCredentialComponent($0)
                 }), placeholder: "Ex: JS9amd9imaims98ajmsi-_000_md2")
               }
               .padding(.horizontal, 12)
@@ -101,8 +101,8 @@ struct CredentialEditAdvancedMode: View {
     }
     .onOpenURL { url in
       if let queryParams = url.queryParameters, let appID = queryParams["appID"], let appSecret = queryParams["appSecret"] {
-        draftCredential.apiAppID = appID
-        draftCredential.apiAppSecret = appSecret
+        draftCredential.apiAppID = RedditAPI.normalizedCredentialComponent(appID)
+        draftCredential.apiAppSecret = RedditAPI.normalizedCredentialComponent(appSecret)
         if draftCredential.validationStatus != .invalid {
           openURL(RedditAPI.shared.getAuthorizationCodeURL(draftCredential.apiAppID))
         }
