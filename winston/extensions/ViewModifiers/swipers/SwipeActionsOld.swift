@@ -45,8 +45,8 @@ struct SwipeActionsModifier: ViewModifier {
     if let parentDragging = parentDragging {
       self.parentDragging = parentDragging
     }
-    self.firstAction = firstAction
-    self.secondAction = secondAction
+    self._firstAction = State(initialValue: firstAction)
+    self._secondAction = State(initialValue: secondAction)
     self.onTapAction = onTapAction
     self.leftActionIcon = leftActionIcon
     self.rightActionIcon = rightActionIcon

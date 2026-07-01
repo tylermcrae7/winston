@@ -59,7 +59,13 @@ enum WinstonAppIcon: String, CaseIterable, Identifiable {
     }
   }
   
-  var preview: UIImage { UIImage(named: self.name ?? "iconStandard")! }
+  var preview: UIImage {
+    // App icon sets can be unavailable through UIImage(named:) in this preview path.
+    UIImage(named: self.name ?? "iconStandard")
+      ?? UIImage(named: "emptyCredential")
+      ?? UIImage(systemName: "app.fill")
+      ?? UIImage()
+  }
 }
 
 class AppIconManger {

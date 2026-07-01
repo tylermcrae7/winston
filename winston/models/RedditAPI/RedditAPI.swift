@@ -18,6 +18,11 @@ class RedditAPI: ObservableObject {
   static let redditApiURLBase = "https://oauth.reddit.com"
   static let redditWWWApiURLBase = "https://www.reddit.com"
   static let appRedirectURI: String = "https://app.winston.cafe/auth-success"
+
+  static func normalizedCredentialComponent(_ value: String) -> String {
+    // Reddit rejects Basic Auth if copied app credentials include hidden whitespace.
+    value.components(separatedBy: .whitespacesAndNewlines).joined()
+  }
   
   var lastAuthState: String?
   @Published var me: User?
@@ -102,13 +107,18 @@ class RedditAPI: ObservableObject {
   }
   
   func injectFirstAccessTokenInto(_ credential: inout RedditCredential, authCode: String) async -> Bool {
-    if !credential.apiAppID.isEmpty && !credential.apiAppSecret.isEmpty {
+    let appID = RedditAPI.normalizedCredentialComponent(credential.apiAppID)
+    let appSecret = RedditAPI.normalizedCredentialComponent(credential.apiAppSecret)
+
+    if !appID.isEmpty && !appSecret.isEmpty {
+      credential.apiAppID = appID
+      credential.apiAppSecret = appSecret
       let headers = await fetchRequestHeaders(includeAuth: false)
       var code = authCode
       if code.hasSuffix("#_") {
         code = "\(code.dropLast(2))"
       }
-      let payload = GetAccessTokenPayload(code: authCode)
+      let payload = GetAccessTokenPayload(code: code)
       let response = await AF.request(
         "\(RedditAPI.redditWWWApiURLBase)/api/v1/access_token",
         method: .post,
@@ -116,10 +126,18 @@ class RedditAPI: ObservableObject {
         encoder: URLEncodedFormParameterEncoder(destination: .httpBody),
         headers: headers
       )
-        .authenticate(username: credential.apiAppID, password: credential.apiAppSecret, persistence: .none)
-        .serializingDecodable(GetAccessTokenResponse.self).response
+        .authenticate(username: appID, password: appSecret, persistence: .none)
+        .serializingData().response
+
       switch response.result {
-      case .success(let data):
+      case .success(let responseData):
+        let decoder = JSONDecoder()
+        guard let data = try? decoder.decode(GetAccessTokenResponse.self, from: responseData) else {
+          let statusCode = (response.response?.statusCode).map(String.init) ?? "unknown"
+          let responseBody = String(data: responseData, encoding: .utf8) ?? "<non-utf8 response body>"
+          print("Reddit OAuth token response did not contain an access token. status=\(statusCode) body=\(responseBody)")
+          return false
+        }
         let newAcessToken = RedditCredential.AccessToken(token: data.access_token, expiration: data.expires_in, lastRefresh: Date())
         credential.refreshToken = data.refresh_token
         credential.accessToken = newAcessToken
@@ -151,6 +169,7 @@ class RedditAPI: ObservableObject {
   }
   
   func  getAuthorizationCodeURL(_ appID: String) -> URL {
+    let normalizedAppID = RedditAPI.normalizedCredentialComponent(appID)
     let response_type: String = "code"
     let state: String = UUID().uuidString
     let redirect_uri: String = RedditAPI.appRedirectURI
@@ -159,7 +178,7 @@ class RedditAPI: ObservableObject {
     
     lastAuthState = state
     
-    return URL(string: "https://www.reddit.com/api/v1/authorize.compact?client_id=\(appID.trimmingCharacters(in: .whitespaces))&response_type=\(response_type)&state=\(state)&redirect_uri=\(redirect_uri)&duration=\(duration)&scope=\(scope)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+    return URL(string: "https://www.reddit.com/api/v1/authorize.compact?client_id=\(normalizedAppID)&response_type=\(response_type)&state=\(state)&redirect_uri=\(redirect_uri)&duration=\(duration)&scope=\(scope)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
   }
   
   struct RefreshAccessTokenResponse: Decodable {
@@ -238,4 +257,3 @@ enum Either<A: Codable & Hashable, B: Codable & Hashable>: Codable, Hashable {
     }
   }
 }
-

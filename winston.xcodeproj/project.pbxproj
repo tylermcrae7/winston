@@ -980,7 +980,7 @@
 		ECB155112B25A18D0069CA2C /* BigInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigInput.swift; sourceTree = "<group>"; };
 		ECB155132B25A1B60069CA2C /* BigInfoCredential.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigInfoCredential.swift; sourceTree = "<group>"; };
 		ECB155172B25A1E30069CA2C /* NiceCredentialSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NiceCredentialSection.swift; sourceTree = "<group>"; };
-		ECB155192B2656310069CA2C /* swiftEnvValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = swiftEnvValues.swift; path = winston/Globals/swiftEnvValues.swift; sourceTree = SOURCE_ROOT; };
+		ECB155192B2656310069CA2C /* swiftEnvValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = swiftEnvValues.swift; path = winston/globals/swiftEnvValues.swift; sourceTree = SOURCE_ROOT; };
 		ECB549D42B189392004E9A96 /* cleanEntitiesWithNilCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = cleanEntitiesWithNilCredentials.swift; sourceTree = "<group>"; };
 		ECB549D82B18C3C5004E9A96 /* removeDefaultThemeFromThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = removeDefaultThemeFromThemes.swift; sourceTree = "<group>"; };
 		ECB549DE2B1908AF004E9A96 /* queryParameters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = queryParameters.swift; sourceTree = "<group>"; };
@@ -1618,7 +1618,7 @@
 				BB53CA992B0D827F003D3332 /* EndOfFeedView.swift */,
 				EC7FBE2E2B411C810082FA44 /* AppContent.swift */,
 			);
-			path = Views;
+			path = views;
 			sourceTree = "<group>";
 		};
 		EC593AFB2A47AEAB002D6454 /* Models */ = {
@@ -1643,7 +1643,7 @@
 				EC4C7CB32B2E17D00007A4DA /* Hap.swift */,
 				EC982A332B4A436600FFE582 /* TimerHolder.swift */,
 			);
-			path = Models;
+			path = models;
 			sourceTree = "<group>";
 		};
 		EC593B042A47B002002D6454 /* Globals */ = {
@@ -1657,7 +1657,7 @@
 				65E45A6F2AFD3E48007DBBFC /* whatsNew.swift */,
 				ECB155192B2656310069CA2C /* swiftEnvValues.swift */,
 			);
-			path = Globals;
+			path = globals;
 			sourceTree = "<group>";
 		};
 		EC6081142B434AEF001A1077 /* ButtonStyles */ = {
@@ -1771,7 +1771,7 @@
 				ECE5AE102B11F66500DA2020 /* shaders */,
 				EC051C462ACAF2DC00E9D9ED /* themeFileIcon.png */,
 			);
-			path = Assets;
+			path = assets;
 			sourceTree = "<group>";
 		};
 		EC77EC052B243A220053B966 /* Store */ = {
@@ -1992,7 +1992,7 @@
 				EC7FBE162B4113560082FA44 /* Colors */,
 				ECDEBD202B31C8D300A8AC78 /* CGGradient+.swift */,
 			);
-			path = Extensions;
+			path = extensions;
 			sourceTree = "<group>";
 		};
 		EC8C70792B4E4EA8004DBA75 /* Nuke */ = {
@@ -2231,7 +2231,7 @@
 				ECDEBD1E2B31C8A200A8AC78 /* EasingFunction.swift */,
 				BBD6E9DA2B50F5D300901C1C /* Comment util.swift */,
 			);
-			path = Utils;
+			path = utils;
 			sourceTree = "<group>";
 		};
 		ECC10C752A4A8746009124BE /* Components */ = {
@@ -2310,7 +2310,7 @@
 				EC49A8F02B49F7C100000EBD /* WinstonButton.swift */,
 				BBD6E9D62B50F37200901C1C /* Quirky Msg Util.swift */,
 			);
-			path = Components;
+			path = components;
 			sourceTree = "<group>";
 		};
 		ECC2C7B52AAC90A7000E196C /* modelSamples */ = {
@@ -2372,7 +2372,7 @@
 				EC77EC062B2441870053B966 /* Editing */,
 				ECC2C7B12AAB48D1000E196C /* ThemesPanel.swift */,
 			);
-			path = Theming;
+			path = theming;
 			sourceTree = "<group>";
 		};
 		ECE449752A68893E00E2A3B7 /* SubredditInfo */ = {
@@ -3321,7 +3321,7 @@
 				CODE_SIGN_ENTITLEMENTS = winston/winston.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = Z2NNLU4F7U;
+				DEVELOPMENT_TEAM = M5H3893R7A;
 				ENABLE_PREVIEWS = NO;
 				FRAMEWORK_SEARCH_PATHS = "$(SRCROOT)/**";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3342,7 +3342,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = lo.cafe.winston;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tylermcrae.winston;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -3364,7 +3364,7 @@
 				CODE_SIGN_ENTITLEMENTS = winston/winston.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = Z2NNLU4F7U;
+				DEVELOPMENT_TEAM = M5H3893R7A;
 				ENABLE_PREVIEWS = NO;
 				FRAMEWORK_SEARCH_PATHS = "$(SRCROOT)/**";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3385,7 +3385,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = lo.cafe.winston;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tylermcrae.winston;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -3399,8 +3399,8 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z2NNLU4F7U;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = M5H3893R7A;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "winston-everywhere/Info.plist";
@@ -3418,7 +3418,7 @@
 					"-framework",
 					SafariServices,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "lo.cafe.winston.winston-everywhere";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tylermcrae.winston.winston-everywhere";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -3433,8 +3433,8 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z2NNLU4F7U;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = M5H3893R7A;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "winston-everywhere/Info.plist";
@@ -3452,7 +3452,7 @@
 					"-framework",
 					SafariServices,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "lo.cafe.winston.winston-everywhere";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tylermcrae.winston.winston-everywhere";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
