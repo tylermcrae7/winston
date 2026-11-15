@@ -105,7 +105,13 @@ struct SubredditPosts: View, Equatable {
     customFilter = filterData
   }
   
+  // Runs on the main actor because it updates view state; the network and post
+  // setup work it awaits still runs in the background.
+  @MainActor
   func asyncFetch(force: Bool = false, loadMore: Bool = false, searchText: String? = nil, forceRefresh: Bool = false) async throws {
+    // Several rows near the bottom can ask for the next page at once.
+    if loadMore && loading { return }
+    
     if (subreddit.data == nil || force) && !isFeedsAndSuch {
       await subreddit.refreshSubreddit()
     }
@@ -171,12 +177,10 @@ struct SubredditPosts: View, Equatable {
             unfilteredreachedEndOfFeed = reachedEndOfFeed
           }
           
-          subreddit.loadFlairs() { loaded in
-            DispatchQueue.main.async {
-              filters = loaded
-            }
-          }
         }
+      } else {
+        // Without this the spinner never goes away and pagination never retries.
+        withAnimation { loading = false }
       }
     } else {
       if let result = await subreddit.fetchSavedMixedMedia(after: loadMore ? lastPostAfter : nil, searchText: searchText, contentWidth: contentWidth) {
@@ -194,12 +198,21 @@ struct SubredditPosts: View, Equatable {
         }
         
         reachedEndOfFeed = result.count == 0
+      } else {
+        withAnimation { loading = false }
       }
     }
   }
   
+  @MainActor
+  func refreshFeed() async {
+    loadedPosts.removeAll()
+    reachedEndOfFeed = false
+    try? await asyncFetch(force: true, searchText: searchText.isEmpty ? nil : searchText, forceRefresh: true)
+  }
+  
   func fetch(_ loadMore: Bool = false, _ searchText: String? = nil, forceRefresh: Bool = false) {
-    Task(priority: .background) {
+    Task(priority: .userInitiated) {
       do {
         try await asyncFetch(loadMore: loadMore, searchText: searchText, forceRefresh: forceRefresh)
       } catch {
@@ -261,6 +274,11 @@ struct SubredditPosts: View, Equatable {
         hasViewLoaded = true
       }
     }
+    .overlay {
+      if !loading && posts.data.isEmpty && !isSavedSubreddit, let error = redditAPI.lastFeedError {
+        FeedErrorView(message: error) { clearAndLoadData(forceRefresh: true) }
+      }
+    }
     .listRowSeparator(.hidden)
     .listSectionSeparator(.hidden)
     .environment(\.defaultMinListRowHeight, 1)
@@ -290,10 +308,11 @@ struct SubredditPosts: View, Equatable {
       clearAndLoadData(withSearchText: searchText)
     }
     .refreshable {
-      clearAndLoadData(forceRefresh: true)
+      // Await the reload so the pull-to-refresh spinner stays until posts arrive.
+      await refreshFeed()
     }
     .navigationTitle("\(isFeedsAndSuch ? subreddit.id.capitalized : "r/\(subreddit.data?.display_name ?? subreddit.id)")")
-    .task(priority: .background) {
+    .task(priority: .userInitiated) {
       if posts.data.count == 0 && (savedMixedMediaLinks?.count == 0 || savedMixedMediaLinks == nil) {
         do {
           try await asyncFetch()
@@ -384,5 +403,31 @@ struct SubredditPostsNavBtns: View, Equatable {
       }
     }
     .animation(nil, value: sort)
+  }
+}
+
+/// Shown when the first page of a feed fails, instead of an endless spinner.
+struct FeedErrorView: View {
+  let message: String
+  let retry: () -> ()
+  
+  var body: some View {
+    VStack(spacing: 12) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.system(size: 40, weight: .bold))
+        .opacity(0.5)
+      Text("Couldn't load posts")
+        .font(.system(size: 20, weight: .bold))
+      Text(message)
+        .font(.system(size: 13))
+        .opacity(0.6)
+        .lineLimit(8)
+        .textSelection(.enabled)
+      Button("Retry", systemImage: "arrow.clockwise", action: retry)
+        .buttonStyle(.bordered)
+    }
+    .multilineTextAlignment(.center)
+    .padding(24)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }

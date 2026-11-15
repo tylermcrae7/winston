@@ -45,6 +45,7 @@ struct MultiPostsView: View {
     customFilter = filterData
   }
   
+  @MainActor
   func asyncFetch(force: Bool = false, loadMore: Bool = false) async {
     //    if (multi.data == nil || force) {
     //      await multi.refreshSubreddit()
@@ -52,10 +53,17 @@ struct MultiPostsView: View {
     if posts.data.count > 0 && lastPostAfter == nil && !force {
       return
     }
+    // Several rows near the bottom can ask for the next page at once.
+    if loadMore {
+      if loading { return }
+      loading = true
+    }
     if let result = await multi.fetchPosts(sort: sort, after: loadMore ? lastPostAfter : nil, contentWidth: contentWidth), let newPosts = result.0 {
       withAnimation {
         if loadMore {
-          posts.data.append(contentsOf: newPosts)
+          // Reddit can repeat a post across pages; duplicate ids make the List jump.
+          let existing = Set(posts.data.map { $0.id })
+          posts.data.append(contentsOf: newPosts.filter { !existing.contains($0.id) })
         } else {
           posts.data = newPosts
         }
@@ -66,11 +74,14 @@ struct MultiPostsView: View {
       Task(priority: .background) {
         await RedditAPI.shared.updatePostsWithAvatar(posts: newPosts, avatarSize: selectedTheme.postLinks.theme.badge.avatar.size)
       }
+    } else {
+      // Without this a failed load leaves the spinner up forever.
+      withAnimation { loading = false }
     }
   }
   
   func fetch(loadMore: Bool = false, _ searchText: String? = nil, forceRefresh: Bool = false) {
-    Task(priority: .background) {
+    Task(priority: .userInitiated) {
       await asyncFetch(loadMore: loadMore)
     }
   }

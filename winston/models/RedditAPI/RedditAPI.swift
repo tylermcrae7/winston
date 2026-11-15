@@ -21,6 +21,14 @@ class RedditAPI: ObservableObject {
   
   var lastAuthState: String?
   @Published var me: User?
+  /// Why the last feed page failed to load, shown in the feed instead of an endless spinner.
+  @Published var lastFeedError: String?
+  
+  func setFeedError(_ error: String?) async {
+    await MainActor.run {
+      if self.lastFeedError != error { self.lastFeedError = error }
+    }
+  }
   
   // This is a replacement for getRequestHeader. We need to replace every instance of the former by this one
   func fetchRequestHeaders(force: Bool = false, includeAuth: Bool = true, altCredential: RedditCredential? = nil, saveToken: Bool = true) async -> HTTPHeaders? {
@@ -88,17 +96,29 @@ class RedditAPI: ObservableObject {
     let result = await req(headers)
     if case .failure(let error) = result {
       print(error)
-      if attempt < (authenticated ? 5 : 2) {
-        return await self._doRequest(attempt: attempt + 1, forceAuth: authenticated && attempt == 2, authenticated: authenticated, altCredential: altCredential, saveToken: saveToken, req: req)
-      }
-      switch error.responseCode {
-      case 401:
-        break
-      default:
-        break
+      if attempt < (authenticated ? 3 : 2) && Self.shouldRetry(error, authenticated: authenticated) {
+        // An expired token gets one immediate retry with a fresh token. Anything else
+        // (rate limit, server error, dropped connection) waits a little before trying
+        // again, so retries don't burn through Reddit's rate limit.
+        let isAuthError = error.responseCode == 401
+        if !isAuthError {
+          try? await Task.sleep(nanoseconds: UInt64(500_000_000 * (1 << attempt)))
+        }
+        return await self._doRequest(attempt: attempt + 1, forceAuth: authenticated && isAuthError, authenticated: authenticated, altCredential: altCredential, saveToken: saveToken, req: req)
       }
     }
     return result
+  }
+  
+  /// Decoding errors and most 4xx responses fail the same way every time, so retrying
+  /// them only adds load and delay.
+  static func shouldRetry(_ error: AFError, authenticated: Bool) -> Bool {
+    if error.isExplicitlyCancelledError || error.isResponseSerializationError { return false }
+    if let code = error.responseCode {
+      if code == 401 { return authenticated }
+      return code == 408 || code == 429 || code >= 500
+    }
+    return true
   }
   
   func injectFirstAccessTokenInto(_ credential: inout RedditCredential, authCode: String) async -> Bool {
@@ -205,6 +225,49 @@ struct ListingData<T: Codable & Hashable>: Codable, Defaults.Serializable, Hasha
   let modhash: String?
   let geo_filter: String?
   var children: [ListingChild<T>]?
+}
+
+/// A Reddit listing that skips children that fail to decode, so one odd post can't
+/// blank a whole feed page. Only use it where a failed decode isn't relied on
+/// (comment threads decode `Either<Listing<PostData>, Listing<CommentData>>`).
+struct LossyListing<T: Codable & Hashable>: Decodable {
+  let after: String?
+  let children: [ListingChild<T>]
+  let skippedCount: Int
+  let firstSkipError: String?
+  
+  private enum CodingKeys: String, CodingKey { case data }
+  private enum DataKeys: String, CodingKey { case after, children }
+  
+  private struct LossyChild: Decodable {
+    let value: ListingChild<T>?
+    let error: String?
+    
+    init(from decoder: Decoder) throws {
+      var decoded: ListingChild<T>? = nil
+      var message: String? = nil
+      do {
+        decoded = try ListingChild<T>(from: decoder)
+      } catch {
+        message = String(describing: error)
+      }
+      value = decoded
+      self.error = message
+    }
+  }
+  
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let data = try container.nestedContainer(keyedBy: DataKeys.self, forKey: .data)
+    after = try data.decodeIfPresent(String.self, forKey: .after)
+    let raw = try data.decodeIfPresent([LossyChild].self, forKey: .children) ?? []
+    children = raw.compactMap { $0.value }
+    skippedCount = raw.count - children.count
+    firstSkipError = raw.first(where: { $0.error != nil })?.error
+    if let skipError = firstSkipError {
+      print("LossyListing skipped \(skippedCount) of \(raw.count) children. First error: \(skipError)")
+    }
+  }
 }
 
 enum Either<A: Codable & Hashable, B: Codable & Hashable>: Codable, Hashable {

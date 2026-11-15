@@ -132,61 +132,61 @@ extension Post {
   static func initMultiple(datas: [T], sub: Subreddit? = nil, contentWidth: CGFloat = 0) -> [Post] {
     let context = PersistenceController.shared.container.newBackgroundContext()
     let fetchRequest = NSFetchRequest<SeenPost>(entityName: "SeenPost")
+    // Only look up the posts in this page, not the whole seen history.
+    fetchRequest.predicate = NSPredicate(format: "postID IN %@", datas.map { $0.id })
     let theme = getEnabledTheme()
 
-    if let results = (context.performAndWait { try? context.fetch(fetchRequest) }) {
+    // A failed seen-posts lookup must not blank the feed, so fall back to "nothing seen".
+    let results = (context.performAndWait { try? context.fetch(fetchRequest) }) ?? []
 
-      let posts = Array(datas.enumerated()).concurrentMap { i, data in
-        let isSeen = context.performAndWait { results.contains(where: { $0.postID == data.id }) }
-        let priorityIMap: [Int:ImageRequest.Priority] = [
-          4: .veryHigh,
-          9: .high,
-          14: .normal,
-          19: .low
-        ]
-        let priority = i > 19 ? .veryLow : priorityIMap[priorityIMap.keys.first { $0 > i } ?? 19]!
-        let newPost = Post(data: data, sub: sub, contentWidth: contentWidth, imgPriority: i > 7 ? .veryLow : priority, theme: theme, fetchAvatar: false)
-        newPost.data?.winstonSeen = isSeen
-        
-        if (isSeen) {
-          Task {
-            await context.perform {
-              let foundPost =  results.first(where: { $0.postID == data.id })
-              newPost.winstonData?.seenCommentsCount = Int(foundPost?.numComments ?? 0)
-              newPost.winstonData?.seenComments = foundPost?.seenComments
-            }
+    let posts = Array(datas.enumerated()).concurrentMap { i, data in
+      let isSeen = context.performAndWait { results.contains(where: { $0.postID == data.id }) }
+      let priorityIMap: [Int:ImageRequest.Priority] = [
+        4: .veryHigh,
+        9: .high,
+        14: .normal,
+        19: .low
+      ]
+      let priority = i > 19 ? .veryLow : priorityIMap[priorityIMap.keys.first { $0 > i } ?? 19]!
+      let newPost = Post(data: data, sub: sub, contentWidth: contentWidth, imgPriority: i > 7 ? .veryLow : priority, theme: theme, fetchAvatar: false)
+      newPost.data?.winstonSeen = isSeen
+      
+      if (isSeen) {
+        Task {
+          await context.perform {
+            let foundPost =  results.first(where: { $0.postID == data.id })
+            newPost.winstonData?.seenCommentsCount = Int(foundPost?.numComments ?? 0)
+            newPost.winstonData?.seenComments = foundPost?.seenComments
           }
         }
-        
-        return newPost
       }
       
-      Task(priority: .background) {
-        if let sub {
-          saveFlairsFromPosts(sub: sub, posts: posts)
-        }
-      }
-      
-      let repostsAvatars = posts.compactMap { post in
-        if case .repost(let repost) = post.winstonData?.extractedMedia {
-          return repost
-        }
-        return nil
-      }
-      
-      Task(priority: .background) { await RedditAPI.shared.updatePostsWithAvatar(posts: repostsAvatars, avatarSize: getEnabledTheme().postLinks.theme.badge.avatar.size) }
-      
-      let imgRequests: [ImageRequest] = posts.reduce(into: []) { prev, curr in
-        if case .imgs(let imgsExtracted) = curr.winstonData?.extractedMedia {
-          let reqs = imgsExtracted.map { $0.request }
-          prev = prev + reqs
-        }
-      }
-      Post.prefetcher.startPrefetching(with: imgRequests)
-      return posts
+      return newPost
     }
     
-    return []
+    Task(priority: .background) {
+      if let sub {
+        saveFlairsFromPosts(sub: sub, posts: posts)
+      }
+    }
+    
+    let repostsAvatars = posts.compactMap { post in
+      if case .repost(let repost) = post.winstonData?.extractedMedia {
+        return repost
+      }
+      return nil
+    }
+    
+    Task(priority: .background) { await RedditAPI.shared.updatePostsWithAvatar(posts: repostsAvatars, avatarSize: getEnabledTheme().postLinks.theme.badge.avatar.size) }
+    
+    let imgRequests: [ImageRequest] = posts.reduce(into: []) { prev, curr in
+      if case .imgs(let imgsExtracted) = curr.winstonData?.extractedMedia {
+        let reqs = imgsExtracted.map { $0.request }
+        prev = prev + reqs
+      }
+    }
+    Post.prefetcher.startPrefetching(with: imgRequests)
+    return posts
   }
   
   static func saveFlairsFromPosts(sub: Subreddit, posts: [Post]) {
@@ -267,6 +267,7 @@ extension Post {
       }
     }
     let fetchRequest = NSFetchRequest<SeenPost>(entityName: "SeenPost")
+    fetchRequest.predicate = NSPredicate(format: "postID == %@", self.id)
     if let results = (await context.perform(schedule: .enqueued) { try? context.fetch(fetchRequest) }) {
       await context.perform(schedule: .enqueued) {
         let foundPost = results.first(where: { obj in obj.postID == self.id })
@@ -313,6 +314,7 @@ extension Post {
     let context = PersistenceController.shared.primaryBGContext
     
     let fetchRequest = NSFetchRequest<SeenPost>(entityName: "SeenPost")
+    fetchRequest.predicate = NSPredicate(format: "postID == %@", self.id)
     if let results = (await context.perform(schedule: .enqueued) { try? context.fetch(fetchRequest) }) {
       await context.perform(schedule: .enqueued) {
         let foundPost = results.first(where: { obj in obj.postID == self.id })
@@ -348,6 +350,7 @@ extension Post {
     let newComments = self.getCommentIds(comments: comments)
     
     let fetchRequest = NSFetchRequest<SeenPost>(entityName: "SeenPost")
+    fetchRequest.predicate = NSPredicate(format: "postID == %@", self.id)
     if let results = (await context.perform(schedule: .enqueued) { try? context.fetch(fetchRequest) }) {
       await context.perform(schedule: .enqueued) {
         let foundPost = results.first(where: { obj in obj.postID == self.id })
@@ -378,6 +381,7 @@ extension Post {
     let context = PersistenceController.shared.primaryBGContext
     
     let fetchRequest = NSFetchRequest<SeenPost>(entityName: "SeenPost")
+    fetchRequest.predicate = NSPredicate(format: "postID == %@", self.id)
     if let results = (await context.perform(schedule: .enqueued) { try? context.fetch(fetchRequest) }) {
       await context.perform(schedule: .enqueued) {
         let foundPost = results.first(where: { obj in obj.postID == self.id })
@@ -633,43 +637,46 @@ class PostWinstonData: Hashable, ObservableObject {
   }
 }
 
+// Fields the app never reads are optional so a Reddit API change to one of them
+// (a removed award field, a number where a string was expected) can't fail the
+// whole listing and leave the feed empty.
 struct PostData: GenericRedditEntityDataType {
   let subreddit: String
   var selftext: String
   var author_fullname: String? = nil
   var saved: Bool
-  let gilded: Int
-  let clicked: Bool
+  let gilded: Int?
+  let clicked: Bool?
   let title: String
   let subreddit_name_prefixed: String
-  let hidden: Bool
+  let hidden: Bool?
   var ups: Int
-  var downs: Int
-  let hide_score: Bool
+  var downs: Int?
+  let hide_score: Bool?
   var post_hint: String? = nil
   let name: String
-  let quarantine: Bool
+  let quarantine: Bool?
   var link_flair_text_color: String? = nil
   let upvote_ratio: Double
-  let subreddit_type: String
-  let total_awards_received: Int
+  let subreddit_type: String?
+  let total_awards_received: Int?
   let is_self: Bool
   let created: Double
   let domain: String
-  let allow_live_comments: Bool
+  let allow_live_comments: Bool?
   var selftext_html: String? = nil
   let id: String
-  let is_robot_indexable: Bool
+  let is_robot_indexable: Bool?
   let author: String
   let num_comments: Int
-  let send_replies: Bool
+  let send_replies: Bool?
   var whitelist_status: String? = nil
-  let contest_mode: Bool
+  let contest_mode: Bool?
   let permalink: String
   let url: String
-  let subreddit_subscribers: Int
+  let subreddit_subscribers: Int?
   var created_utc: Double? = nil
-  let num_crossposts: Int
+  let num_crossposts: Int?
   var is_video: Bool? = nil
   var is_gallery: Bool? = nil
   var gallery_data: GalleryData? = nil
@@ -684,7 +691,7 @@ struct PostData: GenericRedditEntityDataType {
   var link_flair_template_id: String? = nil
   var author_flair_text: String? = nil
   var media: Media? = nil
-  var approved_at_utc: Int? = nil
+  var approved_at_utc: Double? = nil
   var mod_reason_title: String? = nil
   var top_awarded_type: String? = nil
   var author_flair_background_color: String? = nil
@@ -702,8 +709,8 @@ struct PostData: GenericRedditEntityDataType {
   var likes: Bool? = nil
   var stickied: Bool? = nil
   var suggested_sort: String? = nil
-  var banned_at_utc: String? = nil
-  var view_count: String? = nil
+  var banned_at_utc: Double? = nil
+  var view_count: Int? = nil
   var archived: Bool? = nil
   var no_follow: Bool? = nil
   var is_crosspostable: Bool? = nil
