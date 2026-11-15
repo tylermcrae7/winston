@@ -74,8 +74,10 @@ struct SubredditPostsIOS: View, Equatable {
             .environmentObject(sub)
             .environmentObject(post)
             .environmentObject(winstonData)
-            .task(priority: .background) {
-              if(posts.count - 7 == i && !isFiltered && !loading) { loadMorePosts() }
+            .task(priority: .userInitiated) {
+              // Any of the last 7 rows can trigger the next page, so a fast scroll or a failed
+              // load still gets another chance. asyncFetch ignores duplicate calls while loading.
+              if i >= posts.count - 7 && !isFiltered && !loading && !reachedEndOfFeed { loadMorePosts() }
             }
             .listRowInsets(EdgeInsets(top: paddingV, leading: paddingH, bottom: paddingV, trailing: paddingH))
           }
@@ -126,7 +128,7 @@ struct SubredditPostsIOS: View, Equatable {
             .listRowSeparator(.hidden)
             .listSectionSeparator(.hidden)
             .listRowBackground(Color.clear)
-            .id(UUID())
+            .id("feed-loader-\(posts.count)") // fresh spinner per page, but stable while it loads so the list doesn't jump
         }
       }
     }

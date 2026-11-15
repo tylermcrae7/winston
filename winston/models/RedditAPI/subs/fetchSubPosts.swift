@@ -17,11 +17,18 @@ extension RedditAPI {
       
       let urlString = "\(RedditAPI.redditApiURLBase)\(subID)".replacingOccurrences(of: " ", with: "%20")
       
-      switch await self.doRequest(urlString, method: .get, params: params, paramsLocation: .queryString, decodable: Listing<PostData>.self)  {
+      switch await self.doRequest(urlString, method: .get, params: params, paramsLocation: .queryString, decodable: LossyListing<PostData>.self)  {
       case .success(let data):
-        return (data.data?.children, data.data?.after)
+        if data.children.isEmpty, data.skippedCount > 0 {
+          // Every post failed to decode: report it instead of showing an empty feed.
+          await setFeedError("Reddit sent posts the app couldn't read. \(data.firstSkipError ?? "")")
+          return nil
+        }
+        await setFeedError(nil)
+        return (data.children, data.after)
       case .failure(let error):
         print(error)
+        await setFeedError(Self.describeFeedError(error))
         return nil
       }
   }
@@ -39,6 +46,20 @@ extension RedditAPI {
     case .failure(let error):
       print(error)
       return nil
+    }
+  }
+  
+  static func describeFeedError(_ error: AFError) -> String {
+    switch error.responseCode {
+    case 401, 403:
+      return "Reddit refused the request (\(error.responseCode ?? 0)). Check your Reddit credential in Settings."
+    case 429:
+      return "Reddit is rate limiting this app right now (429). Wait a minute and pull to refresh."
+    default:
+      if case .serverTrustEvaluationFailed = error {
+        return "No usable Reddit credential, or its token couldn't be refreshed. Check Settings > Credentials."
+      }
+      return String(describing: error)
     }
   }
   

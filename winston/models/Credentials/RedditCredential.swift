@@ -91,16 +91,15 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
   
   func getUpToDateToken(forceRenew: Bool = false, saveToken: Bool = true) async -> AccessToken? {
     guard let refreshToken = self.refreshToken, !apiAppID.isEmpty && !apiAppSecret.isEmpty else { return nil }
-    if !forceRenew, let accessToken = self.accessToken {
-      let lastRefresh = Double(accessToken.lastRefresh.timeIntervalSince1970)
-      let expiration = Double(max(0, accessToken.expiration - 100))
-      let now = Double(Date().timeIntervalSince1970)
-      
-      if (now - lastRefresh) < expiration {
-        return accessToken
-      }
+    if !forceRenew, let accessToken = self.accessToken, accessToken.isFresh {
+      return accessToken
     }
-    return await fetchNewToken()
+    // On launch the feed, subscriptions, multis and avatars all ask for a token at
+    // once. Share one refresh between them instead of hitting Reddit's token
+    // endpoint once per request (which gets rate limited and fails the feed).
+    return await RedditTokenRefresher.shared.token(for: id, refreshToken: refreshToken, force: forceRenew) {
+      await fetchNewToken()
+    }
     
     func fetchNewToken(count: Int = 0) async -> AccessToken? {
       let payload = RedditAPI.RefreshAccessTokenPayload(refresh_token: refreshToken)
@@ -149,6 +148,14 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
     let token: String
     let expiration: Int
     let lastRefresh: Date
+    
+    /// True while the token has more than 100 seconds left.
+    var isFresh: Bool {
+      let lastRefresh = Double(self.lastRefresh.timeIntervalSince1970)
+      let expiration = Double(max(0, self.expiration - 100))
+      let now = Double(Date().timeIntervalSince1970)
+      return (now - lastRefresh) < expiration
+    }
   }
   
   enum CredentialValidationState: String {
@@ -168,5 +175,32 @@ struct RedditCredential: Identifiable, Equatable, Hashable, Codable {
       let label: String
       let description: String
     }
+  }
+}
+
+/// Shares one access-token refresh between all the requests that need it at the same time.
+actor RedditTokenRefresher {
+  static let shared = RedditTokenRefresher()
+  
+  private var inFlight: [UUID: Task<RedditCredential.AccessToken?, Never>] = [:]
+  private var latest: [UUID: (refreshToken: String, token: RedditCredential.AccessToken)] = [:]
+  
+  func token(for id: UUID, refreshToken: String, force: Bool, fetch: @escaping () async -> RedditCredential.AccessToken?) async -> RedditCredential.AccessToken? {
+    // The new token is saved to the credential asynchronously, so a caller can still
+    // be holding the old expired one. Hand out the token we just got instead.
+    if !force, let cached = latest[id], cached.refreshToken == refreshToken, cached.token.isFresh {
+      return cached.token
+    }
+    if let running = inFlight[id] {
+      return await running.value
+    }
+    let task = Task { await fetch() }
+    inFlight[id] = task
+    let token = await task.value
+    inFlight[id] = nil
+    if let token {
+      latest[id] = (refreshToken: refreshToken, token: token)
+    }
+    return token
   }
 }

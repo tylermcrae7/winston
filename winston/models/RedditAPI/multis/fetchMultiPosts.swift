@@ -13,11 +13,17 @@ extension RedditAPI {
   func fetchMultiPosts(path: String, sort: SubListingSortOption = .best, after: String? = nil) async -> ([ListingChild<PostData>]?, String?)? {
     let limit = Defaults[.SubredditFeedDefSettings].chunkLoadSize
     let params = FetchSubsPayload(limit: limit, after: after)
-    switch await self.doRequest("\(RedditAPI.redditApiURLBase)\(path).json", method: .get, params: params, paramsLocation: .queryString, decodable: Listing<PostData>.self) {
+    switch await self.doRequest("\(RedditAPI.redditApiURLBase)\(path).json", method: .get, params: params, paramsLocation: .queryString, decodable: LossyListing<PostData>.self) {
     case .success(let data):
-      return (data.data?.children, data.data?.after)
+      if data.children.isEmpty, data.skippedCount > 0 {
+        await setFeedError("Reddit sent posts the app couldn't read. \(data.firstSkipError ?? "")")
+        return nil
+      }
+      await setFeedError(nil)
+      return (data.children, data.after)
     case .failure(let error):
       print(error)
+      await setFeedError(Self.describeFeedError(error))
       return nil
     }
   }
